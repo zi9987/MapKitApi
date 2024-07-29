@@ -1,8 +1,10 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct ContentView: View {
-    @State private var cameraPosition: MapCameraPosition = .region(.userRegion)
+    
+    @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var searchText = ""
     @State private var results = [MKMapItem]()
     @State private var mapSelection: MKMapItem?
@@ -11,10 +13,11 @@ struct ContentView: View {
     @State private var routeDisplaying = false
     @State private var route: MKRoute?
     @State private var routeDestination: MKMapItem?
-
+    @StateObject private var viewModel = ContentViewModel()
+    
     var body: some View {
-        Map(position: $cameraPosition, selection: $mapSelection) {
-            Annotation("My location", coordinate: .userLocation) {
+        Map( position: $cameraPosition, selection: $mapSelection) {
+            UserAnnotation() {
                 ZStack {
                     Circle()
                         .frame(width: 32, height: 32)
@@ -40,13 +43,16 @@ struct ContentView: View {
                     .stroke(.blue, lineWidth: 6)
             }
         }
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottom) {
             TextField("Search for a destination...", text: $searchText)
                 .font(.subheadline)
                 .padding(12)
                 .background(Color.white)
                 .padding()
                 .shadow(radius: 10)
+        }
+        .onAppear{
+            viewModel.checkIfLocationServiceIsEnabled()
         }
         .onSubmit(of: .text) {
             Task {
@@ -74,15 +80,16 @@ struct ContentView: View {
         .mapControls {
             MapCompass()
             MapPitchToggle()
+            MapUserLocationButton()
         }
     }
 }
-
+     
 extension ContentView {
     func searchPlaces() async {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = searchText
-        request.region = .userRegion
+        request.region = viewModel.region
         
         do {
             let search = MKLocalSearch(request: request)
@@ -104,7 +111,7 @@ extension ContentView {
     func fetchRoute() {
         if let mapSelection {
             let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: .init(coordinate: .userLocation))
+            request.source = MKMapItem(placemark: .init(coordinate: viewModel.region.center))
             request.destination = mapSelection
             
             Task {
@@ -128,13 +135,13 @@ extension ContentView {
         }
     }
 }
-
+     
 extension CLLocationCoordinate2D {
     static var userLocation: CLLocationCoordinate2D {
         return .init(latitude: 25.02452355830736, longitude: 121.29619785782673)
     }
 }
-
+     
 extension MKCoordinateRegion {
     static var userRegion: MKCoordinateRegion {
         return .init(
@@ -145,6 +152,9 @@ extension MKCoordinateRegion {
     }
 }
 
-#Preview {
-    ContentView()
-}
+   
+    
+    #Preview {
+        ContentView()
+    }
+

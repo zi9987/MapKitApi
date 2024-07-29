@@ -1,52 +1,55 @@
-//
-//  ContentViewModel.swift
-//  MapKitDemo
-//
-//  Created by 羅子淵 on 2024/7/16.
-//
-
+import SwiftUI
 import MapKit
+import CoreLocation
 
-enum MapDetails{
-    static let startinglocation = CLLocationCoordinate2D(latitude: 25.034180117331413, longitude: 121.56449598068548)
-}
-
-final class ContentViewModel :NSObject, ObservableObject, CLLocationManagerDelegate{
+class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published var region = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 25.02452355830736, longitude: 121.29619785782673),
+        latitudinalMeters: 10000,
+        longitudinalMeters: 10000
+    )
     
-    @Published var  region = MKCoordinateRegion(center:MapDetails.startinglocation, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
-    var locationManager:CLLocationManager?
+    private var locationManager: CLLocationManager?
     
-    func checkIfLocationServiceIsEnabled(){
-        if CLLocationManager.locationServicesEnabled(){
-            locationManager = CLLocationManager()
-            locationManager?.desiredAccuracy = kCLLocationAccuracyBest
-            locationManager!.delegate = self
-        }else{
-            print("turn it on")
+    override init() {
+        super.init()
+        locationManager = CLLocationManager()
+        locationManager?.delegate = self
+        locationManager?.desiredAccuracy = kCLLocationAccuracyBest
+        checkIfLocationServiceIsEnabled()
+    }
+    
+    func checkIfLocationServiceIsEnabled() {
+        if CLLocationManager.locationServicesEnabled() {
+            checkLocationAuthorization()
+        } else {
+            print("Location services are not enabled")
         }
     }
     
-    private  func checkLocationAuthorization(){
-        guard let locationManager = locationManager else{return}
+    private func checkLocationAuthorization() {
+        guard let locationManager = locationManager else { return }
         
-        switch locationManager.authorizationStatus{
-            
+        switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
-        case .restricted:
-            print("Your location is restricted")
-        case .denied:
-            print("Your location is denied")
-            
+        case .restricted, .denied:
+            print("Location services are restricted/denied")
         case .authorizedAlways, .authorizedWhenInUse:
-            region = MKCoordinateRegion(center: locationManager.location!.coordinate,span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
-            
+            locationManager.startUpdatingLocation()
         @unknown default:
             break
         }
     }
     
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        checkLocationAuthorization()
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        DispatchQueue.main.async {
+            self.region = MKCoordinateRegion(
+                center: location.coordinate,
+                latitudinalMeters: 10000,
+                longitudinalMeters: 10000
+            )
+        }
     }
 }
